@@ -16,7 +16,6 @@
 import logging
 import os
 import json
-import datetime
 
 from ftl.common import constants
 from ftl.common import ftl_util
@@ -54,11 +53,25 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
     def BuildLayer(self):
         """Override."""
         cached_img = None
+        is_gcp_build = False
+        if self._ctx and self._ctx.Contains(constants.PACKAGE_JSON):
+            is_gcp_build = self._is_gcp_build(
+                json.loads(self._ctx.GetFile(constants.PACKAGE_JSON)))
+
+        if is_gcp_build:
+            if self._should_use_yarn:
+                self._gcp_build(self._directory, 'yarn', 'run')
+                self._cleanup_build_layer()
+            else:
+                self._gcp_build(self._directory, 'npm', 'run-script')
+                self._cleanup_build_layer()
+
+        key = self.GetCacheKey()
         if self._cache:
             with ftl_util.Timing('checking_cached_packages_json_layer'):
-                key = self.GetCacheKey()
                 cached_img = self._cache.Get(key)
-                self._log_cache_result(False if cached_img is None else True)
+                self._log_cache_result(False if cached_img is None else True,
+                                       key)
         if cached_img:
             self.SetImage(cached_img)
         else:
@@ -67,7 +80,7 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
                 self._cleanup_build_layer()
             if self._cache:
                 with ftl_util.Timing('uploading_packages_json_layer'):
-                    self._cache.Set(self.GetCacheKey(), self.GetImage())
+                    self._cache.Set(key, self.GetImage())
 
     def _build_layer(self):
         if self._should_use_yarn:
@@ -75,7 +88,8 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
         else:
             blob, u_blob = self._gen_npm_install_tar(self._directory)
         self._img = tar_to_dockerimage.FromFSImage([blob], [u_blob],
-                                                   self._generate_overrides())
+                                                   ftl_util.generate_overrides(
+                                                       False))
 
     def _cleanup_build_layer(self):
         if self._directory:
@@ -84,20 +98,12 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
             ftl_util.run_command('rm_node_modules', rm_cmd)
 
     def _gen_yarn_install_tar(self, app_dir):
-        is_gcp_build = False
-        if self._ctx and self._ctx.Contains(constants.PACKAGE_JSON):
-            is_gcp_build = self._is_gcp_build(
-                json.loads(self._ctx.GetFile(constants.PACKAGE_JSON)))
-
-        if is_gcp_build:
-            self._gcp_build(app_dir, 'yarn', 'run')
-        else:
-            yarn_install_cmd = ['yarn', 'install', '--production']
-            ftl_util.run_command(
-                'yarn_install',
-                yarn_install_cmd,
-                cmd_cwd=app_dir,
-                err_type=ftl_error.FTLErrors.USER())
+        yarn_install_cmd = ['yarn', 'install', '--production']
+        ftl_util.run_command(
+            'yarn_install',
+            yarn_install_cmd,
+            cmd_cwd=app_dir,
+            err_type=ftl_error.FTLErrors.USER())
 
         module_destination = os.path.join(self._destination_path,
                                           'node_modules')
@@ -105,14 +111,6 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
         return ftl_util.zip_dir_to_layer_sha(modules_dir, module_destination)
 
     def _gen_npm_install_tar(self, app_dir):
-        is_gcp_build = False
-        if self._ctx and self._ctx.Contains(constants.PACKAGE_JSON):
-            is_gcp_build = self._is_gcp_build(
-                json.loads(self._ctx.GetFile(constants.PACKAGE_JSON)))
-
-        if is_gcp_build:
-            self._gcp_build(app_dir, 'npm', 'run-script')
-            self._cleanup_build_layer()
         npm_install_cmd = ['npm', 'install', '--production']
         ftl_util.run_command(
             'npm_install',
@@ -124,12 +122,6 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
                                           'node_modules')
         modules_dir = os.path.join(self._directory, "node_modules")
         return ftl_util.zip_dir_to_layer_sha(modules_dir, module_destination)
-
-    def _generate_overrides(self):
-        overrides_dct = {
-            'created': str(datetime.date.today()) + "T00:00:00Z",
-        }
-        return overrides_dct
 
     def _is_gcp_build(self, package_json):
         scripts = package_json.get('scripts', {})
@@ -156,7 +148,7 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
             env,
             err_type=ftl_error.FTLErrors.USER())
 
-    def _log_cache_result(self, hit):
+    def _log_cache_result(self, hit, key):
         if self._pkg_descriptor:
             if hit:
                 cache_str = constants.PHASE_2_CACHE_HIT
@@ -168,7 +160,7 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
                     language='NODE',
                     package_name=self._pkg_descriptor[0],
                     package_version=self._pkg_descriptor[1],
-                    key=self.GetCacheKey()))
+                    key=key))
         else:
             if hit:
                 cache_str = constants.PHASE_1_CACHE_HIT
@@ -178,4 +170,4 @@ class LayerBuilder(single_layer_image.CacheableLayerBuilder):
                 cache_str.format(
                     key_version=constants.CACHE_KEY_VERSION,
                     language='NODE',
-                    key=self.GetCacheKey()))
+                    key=key))

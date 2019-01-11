@@ -15,7 +15,6 @@
 
 import logging
 import os
-import datetime
 
 from ftl.common import constants
 from ftl.common import ftl_util
@@ -51,11 +50,12 @@ class PhaseOneLayerBuilder(single_layer_image.CacheableLayerBuilder):
     def BuildLayer(self):
         """Override."""
         cached_img = None
+        key = self.GetCacheKey()
         if self._cache:
             with ftl_util.Timing('checking_cached_composer_json_layer'):
-                key = self.GetCacheKey()
                 cached_img = self._cache.Get(key)
-                self._log_cache_result(False if cached_img is None else True)
+                self._log_cache_result(False if cached_img is None else True,
+                                       key)
         if cached_img:
             self.SetImage(cached_img)
         else:
@@ -64,14 +64,14 @@ class PhaseOneLayerBuilder(single_layer_image.CacheableLayerBuilder):
                 self._cleanup_build_layer()
             if self._cache:
                 with ftl_util.Timing('uploading_composer_json_layer'):
-                    self._cache.Set(self.GetCacheKey(), self.GetImage())
+                    self._cache.Set(key, self.GetImage())
 
     def _build_layer(self):
         blob, u_blob = self._gen_composer_install_tar(self._directory,
                                                       self._destination_path)
-        overrides_dct = {'created': str(datetime.date.today()) + 'T00:00:00Z'}
         self._img = tar_to_dockerimage.FromFSImage([blob], [u_blob],
-                                                   overrides_dct)
+                                                   ftl_util.generate_overrides(
+                                                       False))
 
     def _cleanup_build_layer(self):
         if self._directory:
@@ -95,7 +95,7 @@ class PhaseOneLayerBuilder(single_layer_image.CacheableLayerBuilder):
         vendor_destination = os.path.join(destination_path, 'vendor')
         return ftl_util.zip_dir_to_layer_sha(vendor_dir, vendor_destination)
 
-    def _log_cache_result(self, hit):
+    def _log_cache_result(self, hit, key):
         if hit:
             cache_str = constants.PHASE_1_CACHE_HIT
         else:
@@ -104,4 +104,4 @@ class PhaseOneLayerBuilder(single_layer_image.CacheableLayerBuilder):
             cache_str.format(
                 key_version=constants.CACHE_KEY_VERSION,
                 language='PHP',
-                key=self.GetCacheKey()))
+                key=key))

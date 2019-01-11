@@ -1,5 +1,22 @@
 # FTL Release Notes
 
+# Version 0.13.1 - 12/12/2018
+* [NODE] FTL Node caching had an issue that persisted after 0.13.0 due to a release error.  This PR resolves the initial FTL Node caching issue[#743](https://github.com/GoogleCloudPlatform/runtimes-common/pull/743)
+
+# Version 0.13.0 - 11/27/2018
+* [NODE] Updated gcp-build script execution to always run for builds instead of only running when a full rebuild is required[#739](https://github.com/GoogleCloudPlatform/runtimes-common/pull/739)
+* [NODE] Fixed FTL Node issue where cache Get and Set keys could be different resulting in FTL rebuilding images that should have been cached[#738](https://github.com/GoogleCloudPlatform/runtimes-common/pull/738)
+
+# Version 0.12.0 - 11/15/2018
+* [PYTHON] Added --venv-cmd flag to FTL python which allows users to specify a full venv command for FTL to use[#735](https://github.com/GoogleCloudPlatform/runtimes-common/pull/735)
+
+# Version 0.11.0 - 11/09/2018
+* Removed verbosity from tar commands by default as it was too verbose in log output [#726](https://github.com/GoogleCloudPlatform/runtimes-common/pull/726)
+* Updated FTL json error output to match GCB formatting [#727](https://github.com/GoogleCloudPlatform/runtimes-common/pull/727)
+* Added --ttl flag to FTL which allows users to specify the desired TTL for FTL to respect [#732](https://github.com/GoogleCloudPlatform/runtimes-common/pull/732)
+* [NODE] Fixed issue with node cache timestamps which caused node to only cache for 6 hrs a day [#731](https://github.com/GoogleCloudPlatform/runtimes-common/pull/731)
+
+
 # Version 0.10.0 - 10/17/2018
 * [PYTHON] Fixed issue where recursive requirements.txt files did not work properly with FTL [#721](https://github.com/GoogleCloudPlatform/runtimes-common/pull/721)
 * [NODE] Fixed issue with gcp-build scripts where devDependencies were not being cleaned up properly [#723](https://github.com/GoogleCloudPlatform/runtimes-common/pull/723)
@@ -85,5 +102,5 @@
 * [Python] added phase 1.5 implementation to python.  This means faster python builds as some layer uploading can be skipped for cache layers
 * [Python] fixed issue where python was 'pip installing' each run when it should have skipped that step and used the cache
 * [Python] additional logging on pip calls
-* [Python] new flags --python-cmd, --pip-cmd, and --venv-cmd to support different python versions and builder container setups
+* [Python] new flags --python-cmd, --pip-cmd, and --virtualenv-cmd to support different python versions and builder container setups
 * [Python] fixed issue where FTL build would fail if PYTHONPATH was not set in builder
