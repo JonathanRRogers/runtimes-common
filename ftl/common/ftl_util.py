@@ -105,7 +105,7 @@ def zip_dir_to_layer_sha(app_dir, destination_path, alter_symlinks=True):
     tar_path = tempfile.mktemp(suffix='.tar')
     txfrm_regex = 's,^,%s/,' % destination_path
     if alter_symlinks:
-        txfrm_regex = 'flags=r;s,^,%s/,' % destination_path
+        txfrm_regex = r'flags=rh;s,^\./,%s/,' % destination_path
     tar_cmd = [
         'tar',
         '-pcf', tar_path,
